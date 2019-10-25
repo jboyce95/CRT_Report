@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[61]:
+# In[108]:
 
 
 # -*- coding: utf-8 -*-
@@ -16,7 +16,7 @@ import pyodbc
 import time
 
 
-# In[62]:
+# In[109]:
 
 
 #SQL settings, queries and df import
@@ -41,7 +41,7 @@ df = pd.read_sql_query(query.read(),sql_conn)
 sql_conn.close()
 
 
-# In[63]:
+# In[110]:
 
 
 #print out the run time, df shape, and df first five rows
@@ -59,21 +59,21 @@ df_scrub = df
 print("\n Top 5 Rows for df_scrub \n" + str(df_scrub.head()) + "\n")
 
 
-# In[63]:
+# In[111]:
 
 
 #check for number of nulls for each column
 print("Total Count of Null Records \n" + str(df_scrub.isna().count()) + "\n")
 
 
-# In[63]:
+# In[112]:
 
 
 #check the proportion of records that are missing
 print("\n Total Percentage of Null Records \n" + str(df_scrub.isna().mean()) + "\n") #need to fix this to count or % of total using count or upb
 
 
-# In[64]:
+# In[113]:
 
 
 #df datatype summary
@@ -83,7 +83,7 @@ df_scrub.info()
 #df_scrub_cat=df_scrub[df_scrub[]]
 
 
-# In[65]:
+# In[114]:
 
 
 #convert to datetime and confirm converted field
@@ -91,7 +91,7 @@ df_scrub['BidDate'] = pd.to_datetime(df_scrub['BidDate'])
 df_scrub.info()
 
 
-# In[66]:
+# In[156]:
 
 
 #create list of features/columns to drop
@@ -112,10 +112,18 @@ drop_list=['loannumber',
            'TR_7Dy_WonAmount',
            'TR_30Dy_BidVolume',
            'TR_30Dy_WonAmount',
-           'Last10']
+           'Last10',
+           'CRTFlag',
+           'ClientCRTFlag',
+           'ClientId',
+           'ClientName',
+           'BidDate',
+           'BidMonth',
+           'BidWeek',
+           'PropertyStateName'] #just added removal of CRTFlag and ClientID
 
 
-# In[67]:
+# In[157]:
 
 
 #drop features / columns not needed
@@ -123,19 +131,25 @@ df_scrub_drpd = df_scrub.drop(drop_list, axis=1)
 df_scrub_drpd.head()
 
 
-# In[68]:
+# In[158]:
 
 
 df_scrub_drpd.shape
 
 
-# In[88]:
+# In[159]:
+
+
+df_scrub_drpd.columns
+
+
+# In[160]:
 
 
 df_scrub_drpd.index
 
 
-# In[86]:
+# In[161]:
 
 
 #create df of numbers and booleans
@@ -144,20 +158,21 @@ df_scrub_drpd_nums = df_scrub_drpd.select_dtypes(exclude='object') #.reset_index
 df_scrub_drpd_nums.shape
 
 
-# In[87]:
+# In[162]:
 
 
+#probably should delete ClientId (not a real number)
 df_scrub_drpd_nums.head()
 
 
-# In[91]:
+# In[163]:
 
 
 #df_scrub_drpd_nums.iloc[:,0].name
 #df_scrub_drpd_nums.index[1]
 
 
-# In[70]:
+# In[164]:
 
 
 #create df of categorical objects
@@ -165,7 +180,7 @@ df_scrub_drpd_cat = df_scrub_drpd.select_dtypes(include='object')
 df_scrub_drpd_cat.shape
 
 
-# In[95]:
+# In[165]:
 
 
 #create one hot encoding for categorical features
@@ -173,37 +188,37 @@ df_scrub_onehot = pd.get_dummies(df_scrub_drpd[['PropertyTypeRM','LoanPurpose','
 df_scrub_onehot.head()
 
 
-# In[101]:
+# In[174]:
 
 
 #scale the non one hot fields (nums)
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 
-X = df_scrub_drpd_nums.values[:,1:] #skipped BidDate since values cannot be timestamp
-X = np.nan_to_num(X)
-cluster_dataset = StandardScaler().fit_transform(X)
+X1 = df_scrub_drpd_nums.values #[:,1:]  skipped BidDate since values cannot be timestamp
+X1 = np.nan_to_num(X1)
+cluster_dataset = StandardScaler().fit_transform(X1)
 cluster_dataset[:2]
 
 
-# In[99]:
+# In[175]:
 
 
 #df_scrub_drpd_nums.columns
 
 
-# In[107]:
+# In[176]:
 
 
 #re-create the df (without bid date) to include the scaled/transformed data
 df_scrub_drpd_nums_scaled = pd.DataFrame(
     cluster_dataset,
      index=list(df_scrub_drpd_nums.index),
-     columns=df_scrub_drpd_nums.columns[1:])
+     columns=df_scrub_drpd_nums.columns)
 df_scrub_drpd_nums_scaled.head() #WORKED...NOW NEED TO ADD ONE HOT AFTER TRANSFORMED
 
 
-# In[106]:
+# In[169]:
 
 
 #scale the one hot fields
@@ -213,8 +228,52 @@ cluster_dataset_onehot = StandardScaler().fit_transform(X_onehot)
 cluster_dataset_onehot[:2]
 
 
-# In[ ]:
+# In[170]:
 
 
 #add columns back to scaled one hot fields
+#re-create the df (without bid date) to include the scaled/transformed data
+df_scrub_drpd_onehot_scaled = pd.DataFrame(
+    cluster_dataset_onehot,
+     index=list(df_scrub_onehot.index),
+     columns=df_scrub_onehot.columns)
+df_scrub_drpd_onehot_scaled.head() #WORKED...NOW NEED TO ADD ONE HOT AFTER TRANSFORMED
+
+
+# In[172]:
+
+
+#merge num and cat df's
+df_scrub_drpd_scaled = pd.concat([df_scrub_drpd_nums_scaled, df_scrub_drpd_onehot_scaled], axis=1)
+df_scrub_drpd_scaled.head()
+
+
+# In[173]:
+
+
+df_scrub_drpd_scaled.shape
+
+
+# In[ ]:
+
+
+#perform logistic regression on train and test sets
+from sklearn.model_selection import train_test_split
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=4)
+print ('Train set:', X_train.shape,  y_train.shape)
+print ('Test set:', X_test.shape,  y_test.shape)
+
+
+# In[177]:
+
+
+#create correlation matrix
+#have to define y for logistic regression
+
+
+# In[ ]:
+
+
+
 
